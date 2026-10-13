@@ -1,0 +1,4 @@
+project_id = "goteeeqwqcvhmefbhqxr"
+
+[functions.emitir-pdf]
+verify_jwt = true
