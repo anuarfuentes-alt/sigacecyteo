@@ -6,7 +6,8 @@ from datetime import datetime, timezone
 import sqlite3, json, os, secrets
 HOST, PORT = "0.0.0.0", int(os.getenv("SIGA_PORT", "8080"))
 DB = Path(__file__).with_name("demo.sqlite3")
-MATRICULA, PASSWORD = "2026001", "cecyte123"
+USERS = {"2026001": "Alumno de demostración 1", "2026002": "Alumno de demostración 2"}
+PASSWORD = "cecyte123"
 ADMIN_TOKEN = "demo-admin-cambiar"
 def now(): return datetime.now(timezone.utc).isoformat(timespec="seconds")
 def db():
@@ -66,12 +67,13 @@ class H(BaseHTTPRequestHandler):
   if p in ("/api/remote","/api/resolver") and not secrets.compare_digest(self.headers.get("X-Admin-Token",""),ADMIN_TOKEN):self.out(403,{"error":"Acción administrativa no autorizada"});return
   with db() as c:
    if p=="/api/login":
-    if b.get("matricula")!=MATRICULA or b.get("password")!=PASSWORD:self.out(401,{"error":"Matrícula o contraseña incorrectas"});return
+    matricula=b.get("matricula","")
+    if matricula not in USERS or b.get("password")!=PASSWORD:self.out(401,{"error":"Matrícula o contraseña incorrectas"});return
     e=c.execute("SELECT estado FROM equipos WHERE codigo=?",(b.get("equipo"),)).fetchone()
     if not e:self.out(400,{"error":"Equipo no registrado"});return
     if e["estado"]!="Libre":self.out(409,{"error":"Equipo ocupado; cierra la sesión anterior"});return
-    if c.execute("SELECT id FROM sesiones WHERE matricula=? AND fin IS NULL",(MATRICULA,)).fetchone():self.out(409,{"error":"La matrícula ya tiene una sesión activa. Cierra la anterior primero."});return
-    t=now();cur=c.execute("INSERT INTO sesiones(matricula,nombre,equipo,inicio,estado) VALUES(?,?,?,?,?)",(MATRICULA,"Alumno de demostración",b["equipo"],t,"Activa"));c.execute("UPDATE equipos SET estado='En uso' WHERE codigo=?",(b["equipo"],));self.out(200,{"id":cur.lastrowid,"inicio":t});return
+    if c.execute("SELECT id FROM sesiones WHERE matricula=? AND fin IS NULL",(matricula,)).fetchone():self.out(409,{"error":"Esta matrícula ya tiene una sesión activa."});return
+    t=now();cur=c.execute("INSERT INTO sesiones(matricula,nombre,equipo,inicio,estado) VALUES(?,?,?,?,?)",(matricula,USERS[matricula],b["equipo"],t,"Activa"));c.execute("UPDATE equipos SET estado='En uso' WHERE codigo=?",(b["equipo"],));self.out(200,{"id":cur.lastrowid,"inicio":t});return
    if p=="/api/logout":
     s=c.execute("SELECT equipo FROM sesiones WHERE id=? AND fin IS NULL",(b.get("id"),)).fetchone()
     if not s:self.out(404,{"error":"Sesión activa no encontrada"});return
@@ -93,4 +95,4 @@ class H(BaseHTTPRequestHandler):
     c.execute("UPDATE fallas SET estado='Resuelta' WHERE id=?",(b.get("id"),));self.out(200,{"ok":True});return
   self.out(404,{"error":"No encontrado"})
 if __name__=="__main__":
- init();print(f"SIGACEcyTEO demo en http://0.0.0.0:{PORT} | matrícula {MATRICULA} | contraseña {PASSWORD}");ThreadingHTTPServer((HOST,PORT),H).serve_forever()
+ init();print(f"SIGACEcyTEO demo en http://0.0.0.0:{PORT} | matrículas 2026001 y 2026002 | contraseña {PASSWORD}");ThreadingHTTPServer((HOST,PORT),H).serve_forever()
