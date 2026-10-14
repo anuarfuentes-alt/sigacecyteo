@@ -19,7 +19,7 @@ En esa laptop abre http://127.0.0.1:8080.
 ## Laptop 2 y 3: equipos cliente
 En la laptop servidor ejecuta `ipconfig` en Windows y localiza la IPv4 del adaptador Wi-Fi. En Linux ejecuta `hostname -I`. Desde las otras laptops abre `http://IP-DEL-SERVIDOR:8080` sustituyendo por la IP real, por ejemplo `http://192.168.1.20:8080`. Si Windows Firewall pregunta, permite Python únicamente en redes privadas. No abras el puerto a Internet.
 
-Credenciales ficticias: matrícula `2026001`, contraseña `cecyte123`. Selecciona LAB-01 o LAB-02.
+Credenciales ficticias: matrículas `2026001` y `2026002`; contraseña para ambas: `cecyte123`. Usa una matrícula por laptop para mostrar dos sesiones simultáneas: laptop 2 con 2026001/LAB-01 y laptop 3 con 2026002/LAB-02.
 
 ## Guion sugerido
 1. Panel encargado en laptop 1.
