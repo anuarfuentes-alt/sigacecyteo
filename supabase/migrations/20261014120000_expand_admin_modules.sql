@@ -91,3 +91,14 @@ as $$ begin new.updated_at=now(); new.actualizado_por=auth.uid(); return new; en
 drop trigger if exists registros_modulo_touch on public.registros_modulo;
 create trigger registros_modulo_touch before update on public.registros_modulo
 for each row execute function public.sigace_touch_updated_at();
+
+-- Permitir que los roles de alumnos, constancias y expedientes consulten el directorio.
+drop policy if exists "active users read students" on public.alumnos;
+create policy "module staff read students" on public.alumnos for select to authenticated
+using (
+ public.current_app_role()::text in ('Administrador','Operativo','Alumnos','Constancias','Expedientes')
+);
+drop policy if exists "admins manage students" on public.alumnos;
+create policy "admins and student clerks manage students" on public.alumnos for all to authenticated
+using (public.current_app_role()::text in ('Administrador','Alumnos'))
+with check (public.current_app_role()::text in ('Administrador','Alumnos'));
