@@ -1,4 +1,4 @@
-import hashlib, os, secrets, time
+import asyncio, hashlib, os, secrets
 from datetime import datetime, timezone
 from typing import Optional
 import bcrypt
@@ -128,9 +128,9 @@ def telemetry(body: TelemetryRequest, x_agent_key: str = Header(default=""), x_e
     return {"ok":True}
 
 @app.websocket("/api/v1/ws/{equipo_codigo}")
-async def equipment_ws(websocket: WebSocket, equipo_codigo: str, agent_key: str):
+async def equipment_ws(websocket: WebSocket, equipo_codigo: str, x_agent_key: str = Header(default="")):
     try:
-        equipo = require_agent(agent_key, equipo_codigo)
+        equipo = require_agent(x_agent_key, equipo_codigo)
     except HTTPException:
         await websocket.close(code=1008)
         return
@@ -142,8 +142,12 @@ async def equipment_ws(websocket: WebSocket, equipo_codigo: str, agent_key: str)
             rows = supabase.table("cc_comandos").select("*").eq("id_equipo",equipo["id"]).is_("ejecutado_at","null").order("solicitado_at").limit(10).execute()
             for command in rows.data or []:
                 await websocket.send_json({"id":command["id"],"comando":command["comando"],"parametros":command["parametros"]})
-            message = await websocket.receive_json()
-            if message.get("type") == "ack" and message.get("id"):
-                supabase.table("cc_comandos").update({"ejecutado_at":datetime.now(timezone.utc).isoformat(),"resultado":message.get("resultado",{})}).eq("id",message["id"]).eq("id_equipo",equipo["id"]).execute()
+            try:
+                message = await asyncio.wait_for(websocket.receive_json(), timeout=2.0)
+                if message.get("type") == "ack" and message.get("id"):
+                    supabase.table("cc_comandos").update({"ejecutado_at":datetime.now(timezone.utc).isoformat(),"resultado":message.get("resultado",{})}).eq("id",message["id"]).eq("id_equipo",equipo["id"]).execute()
+            except asyncio.TimeoutError:
+                # Revisa la cola cada dos segundos incluso cuando el agente no envía datos.
+                continue
     except WebSocketDisconnect:
         pass
