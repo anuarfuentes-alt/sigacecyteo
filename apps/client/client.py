@@ -1,6 +1,7 @@
 """Aplicación de escritorio del alumno SIGACEcyTEO (Windows 10/11)."""
 from __future__ import annotations
-import base64, hashlib, hmac, json, os, platform, queue, socket, threading, time, uuid
+import base64, ctypes, hashlib, hmac, json, os, platform, queue, socket, threading, time, uuid
+from ctypes import POINTER, Structure, byref, c_ubyte, c_void_p, string_at, wintypes
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse, urlunparse, urlencode
@@ -22,17 +23,53 @@ HTTP_TIMEOUT=5
 def now_iso(): return datetime.now(timezone.utc).isoformat()
 def pbkdf(password,salt): return hashlib.pbkdf2_hmac("sha256",password.encode(),salt,220000)
 
+class DATA_BLOB(Structure):
+    _fields_ = [("cbData", wintypes.DWORD), ("pbData", POINTER(c_ubyte))]
+
+def protect_key_windows(data: bytes) -> bytes:
+    if os.name != "nt":
+        return data
+    crypt32 = ctypes.WinDLL("crypt32", use_last_error=True)
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    crypt32.CryptProtectData.argtypes = [POINTER(DATA_BLOB), wintypes.LPCWSTR, POINTER(DATA_BLOB), c_void_p, c_void_p, wintypes.DWORD, POINTER(DATA_BLOB)]
+    crypt32.CryptProtectData.restype = wintypes.BOOL
+    buf = (c_ubyte * len(data)).from_buffer_copy(data)
+    src = DATA_BLOB(len(data), buf); dst = DATA_BLOB()
+    if not crypt32.CryptProtectData(byref(src), "SIGACEcyTEO offline key", None, None, None, 0, byref(dst)):
+        raise ctypes.WinError(ctypes.get_last_error())
+    try: return b"DPAPI1" + string_at(dst.pbData, dst.cbData)
+    finally: kernel32.LocalFree(dst.pbData)
+
+def unprotect_key_windows(data: bytes) -> bytes:
+    if os.name != "nt" or not data.startswith(b"DPAPI1"):
+        return data
+    crypt32 = ctypes.WinDLL("crypt32", use_last_error=True)
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    crypt32.CryptUnprotectData.argtypes = [POINTER(DATA_BLOB), POINTER(wintypes.LPWSTR), POINTER(DATA_BLOB), c_void_p, c_void_p, wintypes.DWORD, POINTER(DATA_BLOB)]
+    crypt32.CryptUnprotectData.restype = wintypes.BOOL
+    raw = data[6:]; buf = (c_ubyte * len(raw)).from_buffer_copy(raw)
+    src = DATA_BLOB(len(raw), buf); dst = DATA_BLOB(); desc = wintypes.LPWSTR()
+    if not crypt32.CryptUnprotectData(byref(src), byref(desc), None, None, None, 0, byref(dst)):
+        raise ctypes.WinError(ctypes.get_last_error())
+    try: return string_at(dst.pbData, dst.cbData)
+    finally:
+        kernel32.LocalFree(dst.pbData)
+        if desc: kernel32.LocalFree(desc)
+
 class OfflineVault:
-    """Cola y credenciales offline cifradas con Fernet. Protege archivos en reposo; producción Windows debe integrar DPAPI."""
+    """Cola cifrada con Fernet; en Windows la clave de Fernet se protege mediante DPAPI para el usuario actual."""
     def __init__(self):
         root=Path(os.getenv("LOCALAPPDATA") or Path.home()/".local"/"share")/"SIGACEcyTEO"
         root.mkdir(parents=True,exist_ok=True)
         self.keyfile=root/"offline.key"; self.datafile=root/"offline.vault"
         if not self.keyfile.exists():
-            self.keyfile.write_bytes(Fernet.generate_key())
+            raw_key=Fernet.generate_key()
+            protected=protect_key_windows(raw_key) if os.name=="nt" else raw_key
+            self.keyfile.write_bytes(protected)
             try: os.chmod(self.keyfile,0o600)
             except OSError: pass
-        self.fernet=Fernet(self.keyfile.read_bytes())
+        stored_key=self.keyfile.read_bytes()
+        self.fernet=Fernet(unprotect_key_windows(stored_key))
         self.lock=threading.Lock()
         if not self.datafile.exists(): self.save({"users":{},"events":[]})
     def load(self):
@@ -226,6 +263,8 @@ class ClientApp:
         if not getattr(self,"_password_in_memory",None): return
         try:
             data=self.api("/api/auth/login","POST",{"matricula":self.student["matricula"],"password":self._password_in_memory,"computer_code":self.computer_code},token=None)
+            # Cierra la sesión local offline antes de reproducir sus eventos históricos.
+            self.vault.enqueue({"type":"session_end","offline_id":self.offline_id,"computer_code":self.computer_code,"at":now_iso()})
             self.token=data["access_token"]; self.offline_mode=False; self.student["session_id"]=data["session_id"]; self._password_in_memory=None
             self.status.configure(text="Conexión recuperada; sincronizando datos offline."); self.connect_ws(); self.sync_queue()
         except Exception: pass
