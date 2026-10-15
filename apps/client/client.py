@@ -31,6 +31,7 @@ def protect_key_windows(data: bytes) -> bytes:
         return data
     crypt32 = ctypes.WinDLL("crypt32", use_last_error=True)
     kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.LocalFree.argtypes = [c_void_p]; kernel32.LocalFree.restype = c_void_p
     crypt32.CryptProtectData.argtypes = [POINTER(DATA_BLOB), wintypes.LPCWSTR, POINTER(DATA_BLOB), c_void_p, c_void_p, wintypes.DWORD, POINTER(DATA_BLOB)]
     crypt32.CryptProtectData.restype = wintypes.BOOL
     buf = (c_ubyte * len(data)).from_buffer_copy(data)
@@ -45,6 +46,7 @@ def unprotect_key_windows(data: bytes) -> bytes:
         return data
     crypt32 = ctypes.WinDLL("crypt32", use_last_error=True)
     kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.LocalFree.argtypes = [c_void_p]; kernel32.LocalFree.restype = c_void_p
     crypt32.CryptUnprotectData.argtypes = [POINTER(DATA_BLOB), POINTER(wintypes.LPWSTR), POINTER(DATA_BLOB), c_void_p, c_void_p, wintypes.DWORD, POINTER(DATA_BLOB)]
     crypt32.CryptUnprotectData.restype = wintypes.BOOL
     raw = data[6:]; buf = (c_ubyte * len(raw)).from_buffer_copy(raw)
@@ -156,7 +158,7 @@ class ClientApp:
             self.token=data["access_token"]; self.student={"matricula":data["matricula"],"nombre":data["nombre"],"session_id":data["session_id"]}
             self.offline_mode=False; self.offline_id="online-"+str(data["session_id"]); self._password_in_memory=None; self.vault.cache_user(matricula,password,data["nombre"]); self.pass_var.set("")
             self.sync_queue(); self.open_session()
-        except Exception as e:
+        except requests.RequestException as e:
             cached_name=self.vault.verify_user(matricula,password)
             if cached_name:
                 self._password_in_memory=password
@@ -165,7 +167,9 @@ class ClientApp:
                 self.vault.enqueue({"type":"session_start","offline_id":self.offline_id,"computer_code":self.computer_code,"at":now_iso()})
                 self.pass_var.set(""); self.open_session("Modo sin conexión: actividad cifrada localmente; se sincronizará al recuperar la red.")
             else:
-                self.login_status.configure(text="No fue posible conectar o validar. "+str(e))
+                self.login_status.configure(text="No fue posible conectar y no hay credenciales offline válidas. "+str(e))
+        except Exception as e:
+            self.login_status.configure(text="El servidor rechazó el acceso o devolvió un error: "+str(e))
     def open_session(self,notice=None):
         f=ttk.Frame(self.root,padding=24); self.frames["session"]=f
         self.make_header(f,"Sesión del alumno","El equipo registra actividad, telemetría e incidencias.")
@@ -207,7 +211,7 @@ class ClientApp:
             try: self.api("/api/client/logout","POST",{})
             except Exception:
                 self.vault.enqueue({"type":"session_end","offline_id":self.offline_id,"computer_code":self.computer_code,"at":now_iso()})
-        self.close_ws(); self.token=None; self.student={}; self.offline_id=None; self.offline_mode=False; self.locked=False
+        self.close_ws(); self.token=None; self.student={}; self.offline_id=None; self.offline_mode=False; self._password_in_memory=None; self.locked=False
         if hasattr(self,"lock_frame") and self.lock_frame: self.lock_frame.destroy(); self.lock_frame=None
         self.frames["session"].destroy(); self.frames.pop("session",None); self.show_frame("login")
         self.login_status.configure(text="Sesión cerrada."+(" Por instrucción del encargado." if remote else ""))
