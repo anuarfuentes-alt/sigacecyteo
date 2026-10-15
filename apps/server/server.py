@@ -78,6 +78,7 @@ class Incident(Base):
     student_id:Mapped[int]=mapped_column(ForeignKey("students.id"))
     computer_id:Mapped[int]=mapped_column(ForeignKey("computers.id"))
     session_id:Mapped[Optional[int]]=mapped_column(ForeignKey("lab_sessions.id"),nullable=True)
+    event_id:Mapped[Optional[str]]=mapped_column(String(80),unique=True,nullable=True)
     category:Mapped[str]=mapped_column(String(80))
     description:Mapped[str]=mapped_column(Text)
     state:Mapped[str]=mapped_column(String(30),default="Abierta")
@@ -220,10 +221,12 @@ def sync_offline(body:OfflineSync,who=Depends(client_auth),db=Depends(getdb)):
                     c=computer_get(db,ev.get("computer_code",who["computer_code"]))
                     db.add(LabSession(offline_id=offline_id,student_id=who["id"],computer_id=c.id,started_at=at,state="Modo offline sincronizado",mode="offline")); count+=1
             elif kind=="incident":
+                event_id=str(ev.get("event_id",""))[:80]
+                if event_id and db.scalar(select(Incident).where(Incident.event_id==event_id)): continue
                 code=str(ev.get("computer_code",who["computer_code"])).upper()
                 c=db.scalar(select(Computer).where(Computer.code==code)) or db.get(Computer,who["computer_id"])
                 old=db.scalar(select(LabSession).where(LabSession.offline_id==offline_id,LabSession.student_id==who["id"])) if offline_id else None
-                db.add(Incident(student_id=who["id"],computer_id=c.id,session_id=old.id if old else live.id,category=str(ev.get("category","Incidencia offline"))[:80],description=str(ev.get("description",""))[:2000],created_at=at)); count+=1
+                db.add(Incident(student_id=who["id"],computer_id=c.id,session_id=old.id if old else live.id,event_id=event_id or None,category=str(ev.get("category","Incidencia offline"))[:80],description=str(ev.get("description",""))[:2000],created_at=at)); count+=1
             elif kind=="session_end":
                 old=db.scalar(select(LabSession).where(LabSession.offline_id==offline_id,LabSession.student_id==who["id"])) if offline_id else None
                 if old and not old.ended_at: old.ended_at=at; old.state="Cerrada (sin conexión)"; count+=1
