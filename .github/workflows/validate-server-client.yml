@@ -1,0 +1,30 @@
+name: Validate SIGACEcyTEO server and client
+on:
+  push:
+    branches: [feature/server-client-apps]
+  pull_request:
+    branches: [main, feature/demo-tres-laptops]
+jobs:
+  python-checks:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            apps/server/requirements.txt
+            apps/client/requirements.txt
+      - name: Install application and test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt httpx
+          pip install -r ../client/requirements.txt
+      - name: Compile Python modules
+        run: python -m compileall -q server.py ../client/client.py test_server_smoke.py
+      - name: Test server workflows with isolated SQLite
+        run: pytest -q test_server_smoke.py
