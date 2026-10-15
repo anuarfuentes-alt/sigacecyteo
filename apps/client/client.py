@@ -1,6 +1,6 @@
 """Aplicación de escritorio del alumno SIGACEcyTEO (Windows 10/11)."""
 from __future__ import annotations
-import base64, hashlib, json, os, platform, queue, socket, threading, time, uuid
+import base64, hashlib, hmac, json, os, platform, queue, socket, threading, time, uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse, urlunparse, urlencode
@@ -54,11 +54,11 @@ class OfflineVault:
         item=self.load().get("users",{}).get(matricula)
         if not item: return None
         try:
-            good=hashlib.compare_digest(pbkdf(password,bytes.fromhex(item["salt"])).hex(),item["digest"])
+            good=hmac.compare_digest(pbkdf(password,bytes.fromhex(item["salt"])).hex(),item["digest"])
             return item["nombre"] if good else None
         except Exception: return None
     def enqueue(self,event):
-        data=self.load(); data.setdefault("events",[]).append(event); self.save(data)
+        data=self.load(); event.setdefault("event_id",str(uuid.uuid4())); data.setdefault("events",[]).append(event); self.save(data)
     def events(self): return list(self.load().get("events",[]))
     def clear_events(self): 
         data=self.load(); data["events"]=[]; self.save(data)
@@ -117,11 +117,12 @@ class ClientApp:
         try:
             data=self.api("/api/auth/login","POST",{"matricula":matricula,"password":password,"computer_code":self.computer_code},token=None)
             self.token=data["access_token"]; self.student={"matricula":data["matricula"],"nombre":data["nombre"],"session_id":data["session_id"]}
-            self.offline_mode=False; self.offline_id="online-"+str(data["session_id"]); self.vault.cache_user(matricula,password,data["nombre"]); self.pass_var.set("")
+            self.offline_mode=False; self.offline_id="online-"+str(data["session_id"]); self._password_in_memory=None; self.vault.cache_user(matricula,password,data["nombre"]); self.pass_var.set("")
             self.sync_queue(); self.open_session()
         except Exception as e:
             cached_name=self.vault.verify_user(matricula,password)
             if cached_name:
+                self._password_in_memory=password
                 self.token=None; self.offline_mode=True; self.offline_id=str(uuid.uuid4())
                 self.student={"matricula":matricula,"nombre":cached_name,"session_id":None}
                 self.vault.enqueue({"type":"session_start","offline_id":self.offline_id,"computer_code":self.computer_code,"at":now_iso()})
