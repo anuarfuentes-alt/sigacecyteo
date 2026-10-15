@@ -1,0 +1,2 @@
+# Instala esto solo en equipos que usarán cámara para leer QR.
+opencv-python>=4.10,<5.0
