@@ -139,7 +139,7 @@ class ClientApp:
         for frame in self.frames.values(): frame.pack_forget()
         self.frames[name].pack(fill="both",expand=True); self.view=name
     def api(self,path,method="GET",payload=None,token=None,timeout=HTTP_TIMEOUT):
-        base=self.url_var.get().strip().rstrip("/") if hasattr(self,"url_var") else self.server_url
+        base=self.server_url
         headers={}
         active_token=token if token is not None else self.token
         if active_token: headers["Authorization"]="Bearer "+active_token
@@ -270,7 +270,9 @@ class ClientApp:
             # Cierra la sesión local offline antes de reproducir sus eventos históricos.
             self.vault.enqueue({"type":"session_end","offline_id":self.offline_id,"computer_code":self.computer_code,"at":now_iso()})
             self.token=data["access_token"]; self.offline_mode=False; self.student["session_id"]=data["session_id"]; self._password_in_memory=None
-            self.status.configure(text="Conexión recuperada; sincronizando datos offline."); self.connect_ws(); self.sync_queue()
+            self.root.after(0, lambda: self.status.configure(text="Conexión recuperada; sincronizando datos offline.") if self.view=="session" else None)
+            self.root.after(0, self.connect_ws)
+            self.sync_queue()
         except Exception: pass
     def start_workers(self):
         def loop():
