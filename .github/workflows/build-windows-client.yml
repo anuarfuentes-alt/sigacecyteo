@@ -20,6 +20,12 @@ jobs:
           python -m pip install -r apps/client/requirements.txt
           python -m pip install -r apps/client/requirements-qr.txt
           python -m pip install -r apps/client/requirements-build.txt
+      - name: Test encrypted offline cache on Windows
+        shell: pwsh
+        run: |
+          python -m pip install -r apps/client/requirements.txt
+          python -m pip install -r apps/client/requirements-qr.txt
+          python -m pytest -q apps/client/test_offline_vault.py
       - name: Build Windows executable
         shell: pwsh
         run: |
