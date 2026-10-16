@@ -6,6 +6,7 @@ call .venv\Scripts\activate.bat
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 pip install -r requirements-qr.txt
+pip install -r requirements-build.txt
 pyinstaller --noconfirm --clean --onefile --windowed --name SIGACEcyTEOCliente client.py
 echo.
 echo Aplicacion generada en: apps\client\dist\SIGACEcyTEOCliente.exe
