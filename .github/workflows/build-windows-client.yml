@@ -19,6 +19,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r apps/client/requirements.txt
           python -m pip install -r apps/client/requirements-qr.txt
+          python -m pip install -r apps/client/requirements-build.txt
       - name: Build Windows executable
         shell: pwsh
         run: |
