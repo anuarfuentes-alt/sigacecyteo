@@ -83,7 +83,7 @@ Copia la carpeta `apps\\client` a cada PC de laboratorio o usa el ejecutable cre
 3. En el formulario indica `http://IP-DEL-SERVIDOR:8080` y un código de equipo único, por ejemplo `LAB-01` o `LAB-02`.
 4. Inicia sesión con una matrícula y contraseña existentes. El administrador puede dar de alta alumnos desde el panel.
 5. Usa “Reportar falla” para enviar una incidencia al servidor.
-6. La aplicación informa telemetría y revisa comandos durante la sesión. El cierre automático por inactividad está configurado a 15 minutos; cambia la variable `SIGA_IDLE_MINUTES` antes de arrancar para otro valor.
+6. La aplicación informa telemetría y revisa comandos durante la sesión. El cierre de sesión de SIGACEcyTEO por inactividad está configurado a 15 minutos; cambia la variable `SIGA_IDLE_MINUTES` antes de arrancar para otro valor. El bloqueo nativo de Windows está habilitado por defecto con `SIGA_NATIVE_WINDOWS_LOCK=true`. Para una prueba controlada en la que no quieras bloquear el sistema operativo, inicia desde PowerShell con `$env:SIGA_NATIVE_WINDOWS_LOCK="false"; py client.py` (o establece esa variable antes de ejecutar el EXE).
 
 ### QR con cámara
 
