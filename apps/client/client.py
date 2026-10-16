@@ -18,9 +18,37 @@ except Exception:
 
 APP_NAME="SIGACEcyTEO Cliente"
 IDLE_MINUTES=int(os.getenv("SIGA_IDLE_MINUTES","15"))
+NATIVE_WINDOWS_LOCK=os.getenv("SIGA_NATIVE_WINDOWS_LOCK","false").lower() in ("1","true","yes")
 HTTP_TIMEOUT=5
 
 def now_iso(): return datetime.now(timezone.utc).isoformat()
+
+def windows_idle_seconds():
+    """Obtiene el último input del sistema completo en Windows; retorna None en otros sistemas."""
+    if os.name != "nt":
+        return None
+    try:
+        from ctypes import wintypes
+        class LASTINPUTINFO(ctypes.Structure):
+            _fields_=[("cbSize",wintypes.UINT),("dwTime",wintypes.DWORD)]
+        info=LASTINPUTINFO()
+        info.cbSize=ctypes.sizeof(LASTINPUTINFO)
+        if not ctypes.windll.user32.GetLastInputInfo(ctypes.byref(info)):
+            return None
+        current=ctypes.windll.kernel32.GetTickCount()
+        return max(0, (int(current)-int(info.dwTime)) & 0xFFFFFFFF)/1000.0
+    except Exception:
+        return None
+
+def lock_windows_workstation():
+    """Solicita a Windows mostrar su pantalla nativa de bloqueo; no puede desbloquearse desde la aplicación."""
+    if os.name != "nt":
+        return False
+    try:
+        return bool(ctypes.windll.user32.LockWorkStation())
+    except Exception:
+        return False
+
 def pbkdf(password,salt): return hashlib.pbkdf2_hmac("sha256",password.encode(),salt,220000)
 
 class DATA_BLOB(Structure):
@@ -326,6 +354,9 @@ class ClientApp:
     def lock_screen(self):
         if self.view!="session" or self.locked: return
         self.locked=True
+        if NATIVE_WINDOWS_LOCK:
+            # La pantalla nativa de Windows requiere autenticación local para volver al escritorio.
+            lock_windows_workstation()
         self.lock_frame=tk.Frame(self.root,bg="#102b4e"); self.lock_frame.place(relx=0,rely=0,relwidth=1,relheight=1)
         tk.Label(self.lock_frame,text="EQUIPO BLOQUEADO",font=("Segoe UI",28,"bold"),fg="white",bg="#102b4e").pack(pady=(140,20))
         tk.Label(self.lock_frame,text="El encargado del centro de cómputo restringió esta aplicación.",font=("Segoe UI",13),fg="white",bg="#102b4e").pack()
@@ -335,10 +366,15 @@ class ClientApp:
         if self.locked and getattr(self,"lock_frame",None):
             self.lock_frame.destroy(); self.lock_frame=None; self.locked=False; self.notice.configure(text="Aplicación desbloqueada por el encargado.")
     def tick(self):
-        if self.view=="session":
-            if self.token and time.monotonic()-self.last_activity>IDLE_MINUTES*60:
+        if self.view=="session" and (self.token or self.offline_mode):
+            os_idle=windows_idle_seconds()
+            elapsed=os_idle if os_idle is not None else time.monotonic()-self.last_activity
+            if elapsed>IDLE_MINUTES*60:
+                should_native_lock = NATIVE_WINDOWS_LOCK
                 self.logout()
                 self.login_status.configure(text="Sesión cerrada automáticamente por inactividad.")
+                if should_native_lock:
+                    self.root.after(300,lock_windows_workstation)
         self.root.after(1000,self.tick)
     def close(self):
         if self.view=="session":
