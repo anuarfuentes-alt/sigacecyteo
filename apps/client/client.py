@@ -18,7 +18,7 @@ except Exception:
 
 APP_NAME="SIGACEcyTEO Cliente"
 IDLE_MINUTES=int(os.getenv("SIGA_IDLE_MINUTES","15"))
-NATIVE_WINDOWS_LOCK=os.getenv("SIGA_NATIVE_WINDOWS_LOCK","false").lower() in ("1","true","yes")
+NATIVE_WINDOWS_LOCK=os.getenv("SIGA_NATIVE_WINDOWS_LOCK","true").lower() in ("1","true","yes")
 HTTP_TIMEOUT=5
 
 def now_iso(): return datetime.now(timezone.utc).isoformat()
