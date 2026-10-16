@@ -17,7 +17,7 @@ El código es una **base funcional para instalación piloto**, no debe anunciars
 - El cliente reporta hostname, IP, sistema operativo y uso de CPU/RAM/disco si `psutil` está disponible.
 - El modo offline permite entrar solo a una persona que inició sesión en línea previamente en ese cliente; almacena credenciales cacheadas y cola local cifradas con Fernet. En Windows, la clave de Fernet se protege usando DPAPI para el usuario actual; no copies el archivo de datos a otra cuenta o PC. El primer acceso necesita conexión al servidor. La credencial se mantiene en memoria solo durante la sesión offline para reintentar la autenticación; no se escribe la contraseña en disco.
 - La cola se sincroniza al recuperar conectividad y autenticar nuevamente. Los eventos de incidente incluyen identificadores para reducir duplicados.
-- Los comandos “Cerrar sesión” y “Bloquear app” actúan sobre la sesión/interfaz de SIGACEcyTEO. **No son un bloqueo seguro de Windows**. Para impedir salir a otras aplicaciones se debe desplegar Windows Assigned Access/modo quiosco y una cuenta de laboratorio restringida.
+- La app cliente mide la inactividad a nivel del sistema en Windows y cierra la sesión de SIGACEcyTEO tras 15 minutos por defecto. `SIGA_NATIVE_WINDOWS_LOCK=true` está activado por defecto: la app solicita el bloqueo nativo de Windows en inactividad y con el comando remoto de bloqueo. La pantalla segura de Windows solo puede desbloquearse con credenciales locales; un comando remoto no omite ese control. Para impedir que el alumno salga a otras aplicaciones antes de iniciar sesión, completa además el despliegue de Windows Assigned Access/modo quiosco con una cuenta de laboratorio restringida.
 - El servicio se configura con HTTP en la LAN para facilitar el piloto. Para operar con matrículas reales en una red compartida, configura HTTPS/WSS, limita la red/firewall, gestiona secretos, backups y actualizaciones.
 - La tabla de base de datos se crea al iniciar con SQLAlchemy. Antes de producción, hay que formalizar migraciones, backups y pruebas de restauración.
 - La lectura QR requiere cámara y el extra `opencv-python` instalado en el cliente.
@@ -113,7 +113,7 @@ Distribuye el ejecutable y conserva los archivos de configuración/documentació
 4. Envía una incidencia desde un cliente; resuélvela desde el panel.
 5. Genera un QR temporal para un alumno de prueba y accede con cámara.
 6. Envía “Cerrar sesión” y confirma que el cliente vuelve al formulario.
-7. Envía “Bloquear app” y “Desbloquear app”; confirma que se restringe la interfaz de la aplicación. No prueba un bloqueo de Windows.
+7. Envía “Bloquear pantalla” y “Desbloquear app”; el primer comando solicita el bloqueo nativo de Windows por defecto. Verifica que la pantalla segura exige autenticación local. El comando “Desbloquear app” solo quita el overlay de SIGACEcyTEO, no salta la autenticación de Windows.
 8. Exporta CSV, Excel y PDF y verifica su contenido.
 9. Desconecta un cliente de la red, prueba un usuario previamente cacheado, crea un reporte y reconecta. Comprueba que sincroniza la cola offline.
 10. Reinicia servidor y PostgreSQL y comprueba que la bitácora persiste y que se puede restaurar una copia de seguridad.
