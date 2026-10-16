@@ -40,6 +40,10 @@ Si ya tienes un servidor PostgreSQL administrado, crea ahí una base y usuario e
 
 Instala Python 3.11 o posterior para Windows. Abre `apps\\server` y copia `.env.example` como `.env`. Edita `.env`:
 
+**Primera prueba rápida sin instalar PostgreSQL:** define temporalmente `DATABASE_URL=sqlite:///./sigacecyteo_dev.db` y `SIGA_SEED_DEMO=true`. Esto crea una base de datos de prueba con dos matrículas ficticias y permite probar las apps en las tres laptops. No uses esta configuración SQLite como base de producción.
+
+**Instalación del plantel:** instala PostgreSQL y conserva la URL `postgresql+psycopg://...` del ejemplo, actualizando usuario, contraseña y nombre de base de datos.
+
 - Cambia `SIGA_ADMIN_PASSWORD` por una contraseña única y larga.
 - Cambia `CAMBIAR_CLAVE_DB` en `DATABASE_URL` por la contraseña PostgreSQL.
 - Mantén `SIGA_SEED_DEMO=false` en una instalación real.
