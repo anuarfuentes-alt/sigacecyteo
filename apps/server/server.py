@@ -112,6 +112,20 @@ def getdb():
 def startup():
     Base.metadata.create_all(engine)
     with SessionLocal() as db:
+        # Tokens live in memory and expire after a process restart; close stale DB sessions to
+        # avoid leaving computers permanently "occupied" after a planned server reboot.
+        stale=db.scalars(select(LabSession).where(LabSession.ended_at.is_(None))).all()
+        if stale:
+            affected=set()
+            for session in stale:
+                session.ended_at=now()
+                session.state="Cerrada por reinicio del servidor"
+                affected.add(session.computer_id)
+            for computer_id in affected:
+                computer=db.get(Computer,computer_id)
+                if computer and computer.state=="En uso":
+                    computer.state="Libre"
+            db.commit()
         username=os.getenv("SIGA_ADMIN_USER","").strip(); password=os.getenv("SIGA_ADMIN_PASSWORD","")
         if username and password and not db.scalar(select(Admin).where(Admin.username==username)):
             db.add(Admin(username=username,password_hash=hashpw(password),role="Administrador",active=True))
