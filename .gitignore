@@ -5,3 +5,12 @@ dist
 .env.*.local
 .vercel
 .DS_Store
+__pycache__/
+*.py[cod]
+*.db
+*.sqlite3
+apps/server/.venv/
+apps/client/.venv/
+apps/client/build/
+apps/client/dist/
+apps/client/*.spec
